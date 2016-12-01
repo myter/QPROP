@@ -1,0 +1,79 @@
+//Test application having multiple admitters concurrently trying to propagate changes
+//The application is a concurrent version of the one detailed in simple.at
+//Multiple admitters, each owning their own counter, propagate the value through the graph
+//This value, which is even/odd at every two turns, is incremented by x and y and additioned by alwaysEven
+//Function startTest() should always print true 
+
+import /.at.lang.futures exclude seconds,minutes,millisec;
+import /.at.support.timer;
+import lobby.algorithm.nodes;
+import lobby.algorithm.utils;
+import lobby.algorithm.admitter;
+import lobby.algorithm.coordinator;
+enableFutures(true);
+
+def isEven(x){
+	x % 2 == 0
+};
+
+def coor 		:= makeCoordinator();
+def adm1		:= makeAdmitter("adm1");
+def adm2 		:= makeAdmitter("adm2");
+def adm3		:= makeAdmitter("adm3");
+coor<-newAdmitters([adm1,adm2,adm3]);
+def secs 		:= makeNode("secs",[],{||});
+def x 	 		:= makeNode("x",[secs],{|s| s + 1});
+def y 			:= makeNode("y",[secs],{|s| s + 1});
+def alwaysEven	:= makeNode("alwaysEven",[x,y],{|x,y| system.println("Even? => " + isEven(x + y))});
+
+
+def startTest(){
+	startAdm1();
+	startAdm2();
+	startAdm3();
+};
+
+def startAdm1(){
+	actor:{
+		import /.at.support.timer;
+		def counter := 0;
+		def run(){
+			adm1<-changeWith([secs],[counter]);
+			when: 5.seconds() elapsed:{
+				counter := counter + 1;
+				run()
+			}
+		};
+		run()
+	}
+};
+
+def startAdm2(){
+	actor:{
+		import /.at.support.timer;
+		def counter := 0;
+		def run(){
+			adm2<-changeWith([secs],[counter]);
+			when: 6.seconds() elapsed:{
+				counter := counter + 1;
+				run()
+			}
+		};
+		run()
+	}
+};
+
+def startAdm3(){
+	actor:{
+		import /.at.support.timer;
+		def counter := 0;
+		def run(){
+			adm3<-changeWith([secs],[counter]);
+			when: 7.seconds() elapsed:{
+				counter := counter + 1;
+				run()
+			}
+		};
+		run()
+	}
+}

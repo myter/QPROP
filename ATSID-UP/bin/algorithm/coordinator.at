@@ -1,0 +1,78 @@
+object:{
+
+	def Change := isolate:{
+		def submitter;
+		def sources;
+		def values;
+		
+		def init(subm,src,vals){
+			submitter 	:= subm;
+			sources 	:= src;
+			values 		:= vals;
+		}
+	
+	};
+
+	//If the application contains multiple admitters a coordinator is needed to grant exclusive propagate rights to a single admitter
+	def makeCoordinator(){
+		actor:{
+			import /.at.lang.futures;
+			enableFutures(true);
+			
+			def admitters := [];
+			def idleAdmitters := [];
+			def schedule := [];
+			
+			def newAdmitters(adms){
+				admitters := admitters + adms;
+				adms.each:{|adm|
+					adm<-register(self)
+				};
+				idleAdmitters := idleAdmitters + adms;
+			};
+			
+			def newAdmitter(adm){
+				admitters := admitters + [adm];
+				adm<-register(self);
+				idleAdmitters := idleAdmitters + [adm];
+			};
+			
+			def submitChange(adm,sources,values){
+				//Change can only immediatly be propagated through graph if all admitters are idle
+				//Otherwise graph might concurrently be updated
+				if: ((idleAdmitters.length() == admitters.length()).and:{schedule.length() == 0}) then:{
+					//remove admitter from idle list
+					idleAdmitters := idleAdmitters.filter:{|a| !(a == adm)};
+					performChange(Change.new(adm,sources,values));
+				}
+				else:{
+					//If this is not the case, schedule change (in fifo order)
+					def change := Change.new(adm,sources,values);
+					schedule := schedule + [change];
+				}
+			};
+			
+			def admitterNowIdle(adm){
+				idleAdmitters := idleAdmitters + [adm];
+				if: ((idleAdmitters.length() == admitters.length()).and:{schedule.length() > 0}) then:{
+					def change  := schedule.at(1);
+					def changer := change.submitter;
+					//Remove admitter about to gain access to graph from idle list
+					idleAdmitters := idleAdmitters.filter:{|a| !(a == changer)};
+					performChange(schedule.at(1));
+					//remove change from schedule
+					schedule := schedule.select(2,(schedule.length + 1));
+				}
+			};
+			
+			def performChange(change){
+				when: (change.submitter)<-name() becomes:{|n|
+					system.println("Access to propagation granted for admitter: " + n);
+					(change.submitter)<-startChange(change.sources,change.values);
+				}
+			}
+		
+		}
+	}
+
+}

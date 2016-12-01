@@ -1,0 +1,58 @@
+import lobby.algorithm.api;
+////////////////////////
+// Standard Syntax    //
+////////////////////////
+
+deftype t1;
+deftype t2;
+deftype t3;
+deftype t4;
+
+def first := signal: t1
+out: [t2,t3]
+react:{|x| x}
+default:0;
+
+signal: t2
+in: [t1]
+out: [t4]
+react:{|x| x }
+default: 0;
+
+signal: t3
+in: [t1]
+out: [t4]
+react:{|x,y| x }
+default: 0;
+
+signal: t4
+in:[t2,t3]
+react:{|x,y| system.println("X:" + x + " Y: " + y)};
+
+def startStandard(){
+	first(5)
+};
+
+////////////////////////
+// Alternative Syntax //
+////////////////////////
+
+
+deftype a;
+deftype b;
+deftype c;
+deftype d;
+
+def aNode := Signal.new(a,{|x| x},0);
+def bNode := Signal.new(b,{|x| x},0);
+def cNode := Signal.new(c,{|x| x},0);
+def dNode := Signal.new(d,{|x,y| system.println("X: " + x + " Y: " + y)},nil);
+
+-=>(aNode,[bNode,cNode]);
+=->([bNode,cNode],dNode);
+def sources := <>([aNode,bNode,cNode,dNode]);
+
+def startAlternative(){
+	def source1 := sources.get(a);
+	source1(5)
+}

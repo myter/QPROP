@@ -1,0 +1,201 @@
+import /.at.lang.futures;
+enableFutures(true);
+
+object:{
+	
+	//Single node construct
+	//update method used by admitter (i.e. node is an input node)
+	//newPulse method called by parent nodes
+	//name used for debugging purposes, id specified in algorithm is implicit far ref to actor (i.e. self)
+	def makeNode(name,deps,behaviour){
+		actor:{
+			import /.at.collections.java.hashmap;
+			import lobby.algorithm.utils;
+			import lobby.algorithm.DijkstraScholten;
+			import /.at.lang.futures;
+			enableFutures(true);
+			
+			def steadyVal;
+			def pulseState := PulseState.new();
+			
+			//Implementation assumes each node to be remote
+			//Following algorithm specification each node keeps mirror value of parent nodes
+			def mirrors := HashMap.new();
+			
+			//Transitive reachability set of parent nodes
+			def parentsReachableSet := HashMap.new();
+			
+			//Transitive reachability set
+			//create mirror for each dependant
+			def reachableSet := Set.new(deps);
+			//Count number of received sets (to avoid sending children uncomplete info)
+			def setsReceived := 0;
+			//Children waiting for parent set
+			def waiting := [];
+			def listening := false;
+			def readyListener := nil;
+			deps.each:{|d|
+				mirrors.put(d,Mirror.new(d));
+				when: d<-getReachable(self) becomes:{|set|
+					setsReceived := setsReceived + 1;
+					reachableSet := Set.new(reachableSet.union(set));
+					parentsReachableSet.put(d,set);
+					if: setsReceived == deps.length() then:{
+						if: listening then:{
+							readyListener<-nodeReady()
+						};
+						waiting.each:{|r|
+							r.resolve(reachableSet);
+						}
+					}
+				}
+			};
+			
+			def installReadyListener(sender){
+				if: setsReceived == deps.length() then:{
+					sender<-nodeReady()
+				};
+				listening := true;
+				readyListener := sender
+			};
+			
+			//Child nodes
+			def children := [];
+			
+			//Instance of Dijkstra Scholten, used to detect termination
+			def termination := DijkstraScholten.new();
+
+			//Needed to determine transient reachability (unclear how this can be done otherwise)
+			//Called by newly joining node
+			//Keep reference to node since it's a childe node (will need to pulse value to this node)
+			def getReachable(child){
+				children := children + [child];
+				if: setsReceived == deps.length() then:{
+					reachableSet;
+				}
+				else:{
+					def [fut,res] := makeFuture();
+					waiting := waiting + [res];
+					fut
+				}
+
+			};
+			
+			//Received pulse from admitter
+			//Need to create mirrored Pulse 
+			def update(admitter,pulse){
+				pulseState.setChanged();
+				termination.newParentMessage(admitter);
+				children.each:{|c|
+					def p := MirroredPulse.new(pulse.changed,pulse.value,pulseState);
+					c<-newPulse(self,p);
+					termination.newChildMessage();
+				};
+				pulseState.setPending();
+			};
+			
+			//Received pulse from other node
+			def newPulse(sender,pulse){
+				termination.newParentMessage(sender);
+				//Store value in mirror (we might need to wait and saveguard the pulse)
+				def m := mirrors.get(sender);
+				m.steadyValue 	:= pulse.value;
+				m.pulseValue 	:= pulse.pulseState;
+				//Safe to update value ? 
+				def continue := true;
+				//Run over dependencies
+				deps.each:{|d|
+
+					def m := mirrors.get(d);
+					//Did the dependant pulse ? 
+					if: (m.pulseValue).isPending() then:{
+						//Get sdd
+						def parentReachable := parentsReachableSet.get(d);
+						//Calculate xdd
+						def reachableChanges := Set.new((pulse.changed).intersection(parentReachable));
+						if: !(reachableChanges.isEmpty()) then:{
+							//D still has to pulse, need to wait
+							continue := false;
+						}
+					}
+				};
+				if: continue then: {
+					//Is there an input that changed ?
+					def anyChanged := false;
+					//Cach steady values in case we need to reevaluate (should already be in application order)
+					def values := [];
+					deps.each:{|d|
+						def m := mirrors.get(d);
+						values := values + [m.steadyValue];
+						if: (m.pulseValue).isChanged() then:{
+							anyChanged := true;
+						}
+					};
+					if: anyChanged then:{
+						//Reevaluate and propagate
+						when: behaviour<-apply(values) becomes:{|v|
+							steadyVal := v;
+							pulseState.setChanged();
+							def p := MirroredPulse.new(pulse.changed,steadyVal,pulseState);
+							children.each:{|c|
+								termination.newChildMessage();
+								c<-newPulse(self,p)
+							};
+							//Set pulse state back to pending (since all our children have been notified)
+							reset();
+							//No children, we are an output node
+							//signal termination to Dijkstra-Scholten
+							if: children.length == 0 then:{
+								termination.nodeTerminated();
+							}
+						}
+					}
+					else:{
+						//Propagate unchanged
+						pulseState.setUnchanged();
+						def p := MirroredPulse.new(pulse.changed,steadyVal,pulseState);
+						children.each:{|c|
+							termination.newChildMessage();
+							c<-newPulse(self,p)
+						};
+						reset();
+						//No children, we are an output node
+						//signal termination to Dijkstra-Scholten
+						if: children.length == 0 then:{
+							termination.nodeTerminated();
+						}
+					};
+					
+				}
+			};
+			
+			//Method called at the end of each turn by a node
+			//Resets internal pulse state as well as the mirrored pulse states
+			def reset(){
+				pulseState.setPending();
+				deps.each:{|d|
+					def m := mirrors.get(d);
+					(m.pulseValue).setPending();
+				}
+			};
+			
+			//Used for debugging purposes
+			def getName(){
+				name
+			};
+			
+			//Used for debugging purposes
+			def logIf(n,msg){
+				if: name == n then:{
+					system.println(msg);
+				}
+			};
+			
+			//Method implementing Dijkstra Scholten's ack "API"
+			def ack(){
+				termination.newAckMessage();
+			}
+		}
+	};
+
+}

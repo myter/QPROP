@@ -1,0 +1,80 @@
+import lobby.benchmark.diamondGenerator;
+import lobby.algorithm.nodes;
+import lobby.algorithm.coordinator;
+import lobby.algorithm.utils;
+import lobby.algorithm.admitter;
+import /.at.support.timer exclude seconds,minutes,millisec;
+import /.at.lang.futures;
+enableFutures(true);
+
+object:{
+
+	def ThroughputBenchmark := object:
+	{
+		def startTime;
+		def stopTime;
+		def nrAdmitters;
+		def nrChanges;
+		def nrNodes;
+		def fanout;
+		def coor;
+		def generator;
+		def changesPropagated;
+		def listener;
+		
+		def init(amountOfAdmitters,amountOfChanges,amountOfNodes,fan,callback){
+			nrAdmitters 		:= amountOfAdmitters;
+			nrChanges 			:= amountOfChanges;
+			nrNodes				:= amountOfNodes;
+			fanout 				:= fan;
+			coor 				:= makeCoordinator();
+			listener			:= callback;
+			changesPropagated 	:= 0;
+		};
+		
+		def construct(){
+			generator 			:= DiamondGenerator.new(nrNodes,fanout);
+		};
+		
+		def warmup(nrEvents,listener){
+			def callback := {||
+				if: !(nrEvents == 0) then:{
+					nrEvents := nrEvents - 1;
+					step();
+				}
+				else:{
+					listener()
+				}
+			};
+			def tempAdm := makeAdmitter("temp",callback);
+			def step(){
+				tempAdm<-changeWith([generator.firstJoin],[1]);
+			};
+			step();
+		};
+		
+		def run(){
+			def admitters := [];
+			def admitterLambda := {||
+				changesPropagated := changesPropagated + 1;
+				if: changesPropagated == (nrAdmitters * nrChanges) then:{
+					stopTime := jlobby.java.lang.System.nanoTime();
+					listener(stopTime - startTime);
+					changesPropagated := 0;
+				}
+			};
+			nrAdmitters.doTimes:{|i|
+				admitters := admitters + [makeAdmitter(i.toText(),admitterLambda)];
+			};
+			when: coor<-newAdmitters(admitters) becomes:{|something|
+				startTime := jlobby.java.lang.System.nanoTime();
+				admitters.each:{|adm|
+					nrChanges.doTimes:{|i|
+						adm<-changeWith([generator.firstJoin],[1]);
+					}
+				}
+			};
+		}
+	}
+
+}

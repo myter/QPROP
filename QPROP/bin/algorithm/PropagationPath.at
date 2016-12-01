@@ -1,0 +1,18 @@
+object:{
+
+	def PropagationPath := object:{
+		def affectedInput;
+		def origin;
+		
+		def init(origin,affectedInput){
+			self.origin			:= origin;
+			self.affectedInput 	:= affectedInput;
+		};
+		
+		def updateInput(newInput){
+			affectedInput := affectedInput + [newInput];
+		}
+	}
+
+
+}

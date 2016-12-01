@@ -1,0 +1,27 @@
+import lobby.algorithm.api;
+
+deftype Tool1;
+deftype Tool2;
+deftype Tool3;
+deftype Tracker;
+deftype Guard;
+deftype Map;
+deftype AI;
+deftype Client;
+
+def t1Coords := 0;
+def t1Node := SampleSource.new(Tool1,{t1Coords := t1Coords + 1; t1Coords},1.seconds());
+def t2Coords := 0;
+def t2Node := SampleSource.new(Tool2,{t2Coords := t2Coords + 1; t2Coords},1.seconds());
+def t3Coords := 0;
+def t3Node := SampleSource.new(Tool3,{t3Coords := t3Coords + 1; t3Coords},1.seconds());
+def trackNode := Signal.new(Tracker,{|t1,t2,t3| [t1,t2,t3]},[0,100,250]);
+def guardNode := Signal.new(Guard,{|posList| system.println("Guard acknowledged: " + posList)});
+def mapNode := Signal.new(Map,{|posList| posList},[0,100,250]);
+def advice := 0;
+def aiNode := Signal.new(AI,{|posList| advice := advice + 1;advice},0);
+def clientNode := Signal.new(Client,{|advice,posList| system.println("Updating GUI with: " + posList + " , " + advice)});
+=->([t1Node,t2Node,t3Node],trackNode);
+-=>(trackNode,[guardNode,mapNode,aiNode]);
+=->([aiNode,mapNode],clientNode);
+def sources := <>([t1Node,t2Node,t3Node,trackNode,guardNode,mapNode,aiNode,clientNode])

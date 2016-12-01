@@ -1,0 +1,20 @@
+import lobby.algorithm.api;
+
+////////////////////////
+// Alternative Syntax //
+////////////////////////
+
+deftype a;
+deftype b;
+deftype c;
+deftype d;
+
+def count := 0;
+def aNode := SampleSource.new(a,{count := count + 1;count},1.seconds());
+def bNode := Signal.new(b,{|x| x},0);
+def cNode := Signal.new(c,{|x| x},0);
+def dNode := Signal.new(d,{|x,y| system.println("X: " + x + " Y: " + y)},nil);
+
+-=>(aNode,[bNode,cNode]);
+=->([bNode,cNode],dNode);
+def sources := <>([aNode,bNode,cNode,dNode]);

@@ -1,0 +1,14 @@
+def sources := ["node123","node124","node125","node126","node127","node128","node129","node130","node131","node132"];
+def level1 := ["node135","node134","node138","node136", "node133","node141","node137","node143","node142"];
+def level2 := ["node147","node144","node151","node146","node145","node150","node149","node152","node148"];
+def level3 := ["node153","node154","node161","node166","node165","node163","node162","node164","node167"];
+def level4 := ["node168","node171","node170","node169","node173","node174","node176","node172","node175"];
+def level5 := ["node201","node202","node178","node203","node205","node204","node177","node206","node207"];
+def level6 := ["node209","node208","node212","node213","node210","node211","node216","node217","node215","node214"];
+def sink := "node218";
+def all := sources + level1 + level2 + level3 + level4 + level5 + level6 + [sink];
+actor:{/.distributedBenchmarks.master};
+actor:{def adm := /.distributedBenchmarks.admitter;adm.set(1,1)};
+all.each:{|name|
+	actor:{/.distributedBenchmarks.nodeScript.go(name)}
+}

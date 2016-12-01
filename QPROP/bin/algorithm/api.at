@@ -1,0 +1,185 @@
+object:{
+	import /.at.collections.java.hashmap;
+	import /.at.support.timer;
+	
+	
+	//Intermediate or output signals
+	def signal:in:out:react:default:(type,input,output,react,default){
+ 		def scriptedReact := script: react;
+		actor:{
+			import lobby.algorithm.Node;
+			
+			def qpropNode := makeNode(type,input,output,scriptedReact,default);
+			
+			def updateValue(newValue){
+				qpropNode<-updateValue(newValue)
+			}
+		}
+	};
+	
+	//Source signals, provide a method for the "outside world" to imperatively update them
+	def source:out:default:(type,output,defVal){
+		def qpropNode := signal: type
+		in: []
+		out: output
+		react: {|x| x}
+		default: defVal;
+		
+		def updateSignal(newValue){
+			qpropNode<-updateValue(newValue)
+		};
+	};
+	
+	def source:out:(type,output){
+		source: type
+		out: output
+		default: nil
+	};
+	
+	def source:out:sample:with:(type,output,sampleExpression,sampleRate){
+		def qpropNode := signal: type
+		in: []
+		out: output
+		react: {|x| x}
+		default: nil;
+		
+		def loop(){	
+			when: sampleRate elapsed:{
+				qpropNode<-updateValue(sampleExpression());
+				loop()
+			}
+		};
+		loop()
+	};
+	
+	//Sink signals, just to make output: optional
+	def signal:in:react:(type,input,react){
+		signal: type
+		in: input
+		out: []
+		react: react
+		default: nil;
+	};
+	
+	
+	//ALTERNATIVE SYNTAX
+	deftype SourceTag;
+	deftype SampleSourceTag;
+	
+	def Signal := object:{
+		def type;
+		def react;
+		def default;
+		def inputs;
+		def outputs;
+		
+		def init(type,react,default := nil){
+			self.type 		:= type;
+			self.react		:= react;
+			self.default 	:= default;
+			inputs			:= [];
+			outputs			:= [];
+		};
+		
+		def addInputs(ips){
+			inputs := inputs + ips;
+		};
+		
+		def addOutputs(ops){
+			outputs := outputs + ops
+		};
+	};
+	
+	def Source := extend: Signal with:{
+		
+		def init(type,default){
+			super.init(type,{},default)
+		}
+		
+	}taggedAs:[SourceTag];
+	
+	def SampleSource := extend: Signal with:{
+		def sampleExpression;
+		def sampleRate;
+		
+		def init(type,sampleExpression,sampleRate){
+			super.init(type,{},nil);
+			self.sampleExpression := sampleExpression;
+			self.sampleRate		  := sampleRate;
+		}
+	}taggedAs:[SampleSourceTag];
+	
+	//Connects a signal x to multiple signals y
+	def -=>(x,ys){
+		x.addOutputs(ys.map:{|y| y.type});
+		ys.each:{|y|
+			y.addInputs([x.type]);
+		};
+	};
+	
+	//Connects multiple signals xs to a signal y
+	def =->(xs,y){
+		xs.each:{|x|
+			x.addOutputs([y.type]);
+		};
+		y.addInputs(xs.map:{|x| x.type})
+	};
+	
+	//Connects a signal x to a signal y
+	def ->(x,y){
+		x.addOutputs([y.type]);
+		y.addInputs([x.type])
+	};
+	
+	//Dynamic graph configuration
+	//New node second argument
+	def ->*(x,y){
+		y.addInputs([x.type])
+	};
+	
+	def *->(x,y){
+		x.addOutputs([y.type])
+	};
+	
+	def =->*(xs,y){
+		xs.each:{|x|
+			y.addInputs([x.type])
+		};
+	};
+	
+	def *-=>(x,ys){
+		ys.each:{|y|
+			x.addOutputs([y.type])
+		}
+	};
+	
+	//Let graph construction and initialisation begin 
+	def <>(signals){
+		def sources := HashMap.new();
+		
+		signals.each:{|s|
+			if: (is: s taggedAs: SourceTag) then:{
+				def ref := source: s.type out: s.outputs default: s.default;
+				sources.put(s.type,ref);
+			}
+			else:{
+				if: (is: s taggedAs: SampleSourceTag) then:{
+					def ref := source: s.type out: s.outputs sample: s.sampleExpression with: s.sampleRate;
+					sources.put(s.type,ref)
+				}
+				else:{
+					signal: s.type
+					in: s.inputs
+					out: s.outputs
+					react: s.react
+					default: s.default;
+				}
+			}
+		};
+		sources
+	};
+	
+	def <>*(signals){
+		<>(signals)
+	};
+}

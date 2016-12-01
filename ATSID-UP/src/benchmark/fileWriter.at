@@ -1,0 +1,28 @@
+object:{
+
+	def FileWriter := object:{
+		def filePath;
+		def jWriter;
+	
+		def init(path){
+			filePath := path;
+			def f := jlobby.java.io.File.new(path);
+			//f.getParentFile().mkdirs();
+			system.println(f.getAbsolutePath());
+			jWriter := jlobby.java.io.PrintWriter.new(f);
+		};
+		
+		def writeLine(ln){
+			def printer := jWriter.&println;
+			(printer.cast(jlobby.java.lang.String))(ln);
+		};
+		
+		def close(){
+			jWriter.flush();
+			jWriter.close();
+			system.println("File closed");
+		}
+	
+	}
+
+}

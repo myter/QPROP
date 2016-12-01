@@ -1,0 +1,23 @@
+import /.at.lang.futures;
+enableFutures(true);
+deftype Master;
+deftype Admitter;
+deftype Source;
+
+network.online();
+def admitterRef;
+when: Admitter discovered:{|adm|
+	admitterRef := adm
+};
+def remoteInterface := object:{
+	def nodesInit := 0;
+	def nodeInit(){
+		nodesInit := nodesInit + 1;
+		if: nodesInit == 66 then:{
+			system.println("ALL NODES INIT");
+			admitterRef<-startBench()
+		}
+	}
+};
+
+export: remoteInterface as: Master;

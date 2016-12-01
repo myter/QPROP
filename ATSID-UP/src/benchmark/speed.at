@@ -1,0 +1,53 @@
+import lobby.benchmark.diamondGenerator;
+import lobby.algorithm.nodes;
+import lobby.algorithm.utils;
+import lobby.algorithm.admitter;
+import /.at.support.timer;
+
+object:{
+
+	def SpeedBenchmark := object:{
+		def startTime;
+		def stopTime;
+		def nodes;
+		def fanout;
+		def listener;
+		def generator;
+		def adm;
+
+				
+		def init(ns,fan,callback){
+			listener := callback;
+			nodes := ns;
+			fanout := fan;
+		};
+		
+		def construct(){
+			adm 			:= makeAdmitter("adm",{|| stopTime := jlobby.java.lang.System.nanoTime();listener(stopTime - startTime)});
+			generator 		:= DiamondGenerator.new(nodes,fanout);
+		};
+		
+		def warmup(nrEvents,listener){
+			def callback := {||
+				if: !(nrEvents == 0) then:{
+					nrEvents := nrEvents - 1;
+					step();
+				}
+				else:{
+					listener()
+				}
+			};
+			def tempAdm := makeAdmitter("adm",callback);
+			def step(){
+				tempAdm<-changeWith([generator.firstJoin],[1]);
+			};
+			step();
+		};
+		
+		def run(){
+			startTime := jlobby.java.lang.System.nanoTime();
+			adm<-changeWith([generator.firstJoin],[1]);
+		}
+	}
+	
+}

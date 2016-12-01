@@ -1,0 +1,68 @@
+object:{
+	def makeAdmitter(name, callback := {}){
+		
+		actor:{|name, callback|
+			import lobby.algorithm.utils;
+			import lobby.algorithm.DijkstraScholten;
+			
+			//Instance of Dijkstra Scholten, used to detect termination
+			def termination := DijkstraScholten.new({|| system.println("Turn has ended for admitter: " + name);callback<-apply([]);coordinator<-admitterNowIdle(self)});
+			
+			//reference to coordinator (in case there are multiple admitters)
+			def coordinator;
+			
+			//Method called by "external world" to modify given source nodes with given values
+			//Only able to start propagating values if previous turn is done 
+			def changeWith(sources,values){
+				if: coordinator == nil then:{
+					//We are in a single admitter application
+					//Start change if previous turn has ended
+					if: termination.isIdle() then:{
+						startChange(sources,values)
+					}
+				}
+				else:{
+					//Else request right to change from coordinator
+					coordinator<-submitChange(self,sources,values);
+				}
+			};
+			
+			def startChange(sources,values){
+				def index := 1;
+				sources.each:{|s|
+					def pulse := Pulse.new(Set.new(sources),values.at(index));
+					s<-update(self,pulse);
+					index := index + 1;
+					termination.newChildMessage();
+				}
+			};
+			
+			
+			def ack(){
+				termination.newAckMessage();
+				//Are we in a concurrent aplication
+				//If so signal our termination to coordinator
+				if: (termination.isIdle().and:{!(coordinator == nil)}) then:{
+					coordinator<-admitterNowIdle(self);
+				}
+			};
+			
+			def isIdle(){
+				termination.isIdle();
+			};
+			
+			//Used by coordinator to determine when next turn can start
+			def register(coor){
+				coordinator := coor;
+			};
+			
+			//Used for debugging purposes
+			def getName(){
+				name
+			}
+			
+		}
+		
+	}
+
+}

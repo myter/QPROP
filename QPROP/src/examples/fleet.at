@@ -1,0 +1,59 @@
+import lobby.algorithm.api;
+
+deftype Tool1;
+deftype Tool2;
+deftype Tool3;
+deftype Tracker;
+deftype Guard;
+deftype Map;
+deftype AI;
+deftype Client;
+
+def t1Coords := 0;
+source: Tool1
+out: [Tracker]
+sample: {t1Coords := t1Coords + 1; t1Coords}
+with: 1.seconds();
+
+def t2Coords := 100;
+source: Tool2
+out: [Tracker]
+sample: {t2Coords := t2Coords + 1; t2Coords}
+with: 1.seconds();
+
+def t3Coords := 250;
+source: Tool3
+out: [Tracker]
+sample: {t3Coords := t3Coords + 1; t3Coords}
+with: 1.seconds();
+
+signal: Tracker
+in: [Tool1,Tool2,Tool3]
+out: [Guard,Map,AI]
+react:{|t1,t2,t3| [t1,t2,t3]}
+default:[0,100,250];
+
+signal: Guard
+in: [Tracker]
+out:[]
+react:{|posList| system.println("Guard acknowledged: " + posList)}
+default: nil;
+
+signal: Map
+in: [Tracker]
+out: [Client]
+react:{|posList| posList}
+default: [0,100,250];
+
+def advice := 0;
+signal: AI
+in: [Tracker]
+out: [Client]
+react:{|posList| advice := advice + 1;advice}
+default: 0;
+
+signal: Client
+in: [AI,Map]
+out: []
+react:{|advice,posList| system.println("Updating GUI with: " + posList + " , " + advice)}
+default: nil;

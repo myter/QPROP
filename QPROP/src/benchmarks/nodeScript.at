@@ -1,0 +1,177 @@
+import lobby.algorithm.api;
+deftype Master;
+deftype SourceBench;
+//SourceBenchs
+deftype node123 <: SourceBench;
+deftype node124 <: SourceBench;
+deftype node125 <: SourceBench;
+deftype node126 <: SourceBench;
+deftype node127 <: SourceBench;
+deftype node128 <: SourceBench;
+deftype node129 <: SourceBench;
+deftype node130 <: SourceBench;
+deftype node131 <: SourceBench;
+deftype node132 <: SourceBench;
+
+deftype node135;
+deftype node134;
+deftype node138;
+deftype node136;
+deftype node133;
+deftype node141;
+deftype node137;
+deftype node143;
+deftype node142;
+
+deftype node147;
+deftype node144;
+deftype node151;
+deftype node146;
+deftype node145;
+deftype node150;
+deftype node149;
+deftype node152;
+deftype node148;
+
+deftype node153;
+deftype node154;
+deftype node161;
+deftype node166;
+deftype node165;
+deftype node163;
+deftype node162;
+deftype node164;
+deftype node167;
+
+deftype node168;
+deftype node171;
+deftype node170;
+deftype node169;
+deftype node173;
+deftype node174;
+deftype node176;
+deftype node172;
+deftype node175;
+
+deftype node201;
+deftype node202;
+deftype node178;
+deftype node203;
+deftype node205;
+deftype node204;
+deftype node177;
+deftype node206;
+deftype node207;
+
+deftype node209;
+deftype node208;
+deftype node212;
+deftype node213;
+deftype node210;
+deftype node211;
+deftype node216;
+deftype node217;
+deftype node215;
+deftype node214;
+//Sink
+deftype node218;
+
+def sources := ["node123","node124","node125","node126","node127","node128","node129","node130","node131","node132"];
+def level1 := ["node135","node134","node138","node136", "node133","node141","node137","node143","node142"];
+def level2 := ["node147","node144","node151","node146","node145","node150","node149","node152","node148"];
+def level3 := ["node153","node154","node161","node166","node165","node163","node162","node164","node167"];
+def level4 := ["node168","node171","node170","node169","node173","node174","node176","node172","node175"];
+def level5 := ["node201","node202","node178","node203","node205","node204","node177","node206","node207"];
+def level6 := ["node209","node208","node212","node213","node210","node211","node216","node217","node215","node214"];
+def sink := "node218";
+
+def switch(tc,cases,actions,default){
+	def index := 1;
+	def res;
+	{|exit|
+		cases.each:{|case|
+			if: (tc == case) then:{
+				res := actions[index].apply([]);
+				exit()
+			};
+			index := index + 1
+		};
+		res := default.apply([])
+	}.escape();
+	res
+};
+
+def getType(name){
+	def cases := sources + level1 + level2 + level3 + level4 + level5 + level6 + [sink];
+	def sourceActions := [{node123},{node124},{node125},{node126},{node127},{node128},{node129},{node130},{node131},{node132}];
+	def level1Actions := [{node135},{node134},{node138},{node136},{node133},{node141},{node137},{node143},{node142}];
+	def level2Actions := [{node147},{node144},{node151},{node146},{node145},{node150},{node149},{node152},{node148}];
+	def level3Actions := [{node153},{node154},{node161},{node166},{node165},{node163},{node162},{node164},{node167}];
+	def level4Actions := [{node168},{node171},{node170},{node169},{node173},{node174},{node176},{node172},{node175}];
+	def level5Actions := [{node201},{node202},{node178},{node203},{node205},{node204},{node177},{node206},{node207}];
+	def level6Actions := [{node209},{node208},{node212},{node213},{node210},{node211},{node216},{node217},{node215},{node214}];
+	def sinkAction := [{node218}];
+	def allActions := sourceActions + level1Actions + level2Actions + level3Actions + level4Actions + level5Actions + level6Actions + sinkAction;
+	switch(name,cases,allActions,{println("Unable to find node type")})
+};
+
+def getParents(name){
+	def cases := sources + level1 + level2 + level3 + level4 + level5 + level6 + [sink];
+	def sourceActions := [{[]},{[]},{[]},{[]},{[]},{[]},{[]},{[]},{[]},{[]}];
+	def level1Actions := [{[node123,node124]},{[node125,node127]},{[node126]},{[node125,node127]},{[node128,node129,node130]},{[node130]},{[node130]},{[node131,node132]},{[node131,node132]}];
+	def level2Actions := [{[node135,node138]},{[node134,node138]},{[node135,node136]},{[node136,node133]},{[node133]},{[node133,node141]},{[node141,node137,node143]},{[node142,node143]},{[node143]}];
+	def level3Actions := [{[node147]},{[node147]},{[node144]},{[node151,node146]},{[node146,node145]},{[node149,node150]},{[node149]},{[node152,node148]},{[node148]}];
+	def level4Actions := [{[node153,node154]},{[node153]},{[node161,node165]},{[node166]},{[node165]},{[node162,node167]},{[node162]},{[node164]},{[node163]}];
+	def level5Actions := [{[node168]},{[node170]},{[node171]},{[node173]},{[node173]},{[node174]},{[node176,node172]},{[node175]},{[node169]}];
+	def level6Actions := [{[node168]},{[node201]},{[node178]},{[node203]},{[node203]},{[node205]},{[node202,node204]},{[node177]},{[node206]},{[node207]}];
+	def sinkAction := [{[node209,node208,node212,node213,node210,node211,node216,node217,node215,node214]}];
+	def allActions := sourceActions + level1Actions + level2Actions + level3Actions + level4Actions + level5Actions + level6Actions + sinkAction;
+	switch(name,cases,allActions,{println("Unable to find node parents")})
+};
+
+def getChildren(name){
+	def cases := sources + level1 + level2 + level3 + level4 + level5 + level6 + [sink];
+	def sourceActions := [{[node135]},{[node135]},{[node134,node136]},{[node138]},{[node134,node136]},{[node133]},{[node133]},{[node133,node141,node137]},{[node143,node142]},{[node143,node142]}];
+	def level1Actions := [{[node147,node151]},{[node144]},{[node147,node144]},{[node151,node146]},{[node146,node145,node150]},{[node150,node149]},{[node149]},{[node149,node152,node148]},{[node152]}];
+	def level2Actions := [{[node153,node154]},{[node161]},{[node166]},{[node166,node165]},{[node165]},{[node163]},{[node163,node162]},{[node164]},{[node164,node167]}];
+	def level3Actions := [{[node168,node171]},{[node168]},{[node170]},{[node169]},{[node170,node173]},{[node175]},{[node174,node176]},{[node172]},{[node174]}];
+	def level4Actions := [{[node201,node209]},{[node178]},{[node202]},{[node207]},{[node203,node205]},{[node204]},{[node177]},{[node177]},{[node206]}];
+	def level5Actions := [{[node208]},{[node216]},{[node212]},{[node213,node210]},{[node211]},{[node216]},{[node217]},{[node215]},{[node214]}];
+	def level6Actions := [{[node218]},{[node218]},{[node218]},{[node218]},{[node218]},{[node218]},{[node218]},{[node218]},{[node218]},{[node218]}];
+	def sinkAction := [{[]}];
+	def allActions := sourceActions + level1Actions + level2Actions + level3Actions + level4Actions + level5Actions + level6Actions + sinkAction;
+	switch(name,cases,allActions,{println("Unable to find node children")})
+};
+
+def makeNode(type,parentTypes,childrenTypes){
+	when: Master discovered:{|masterRef|
+		if: parentTypes.length() == 0 then:{
+			system.println("Created source with type: " + type);
+			source: type
+			out: childrenTypes
+		}
+		else:{
+			if: childrenTypes.length() == 0 then:{
+				signal: type
+				in: parentTypes
+				react: {|@args| masterRef<-propagationFinished()}
+			}
+			else:{
+				signal: type
+				in: parentTypes
+				out: childrenTypes
+				react:{|@args| system.println("Node processed value"); 0}
+				default: 0
+			}
+		}
+	}
+};
+network.online();
+//def name := system.argv[1];
+//makeNode(getType(name),getParents(name),getChildren(name))
+//Used during testing
+object:{
+	def go(name){
+		makeNode(getType(name),getParents(name),getChildren(name))
+	}
+}

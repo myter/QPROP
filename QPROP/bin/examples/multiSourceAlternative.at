@@ -1,0 +1,31 @@
+import lobby.algorithm.api;
+////////////////////////
+// Alternative Syntax //
+////////////////////////
+
+//Source node 1
+deftype a;
+//Source node 2
+deftype b;
+deftype c;
+deftype d;
+//Sink node
+deftype e;
+
+def aNode := Source.new(a,0);
+def bNode := Source.new(b,0);
+def cNode := Signal.new(c,{|x,y| x + y},0);
+def dNode := Signal.new(d,{|x| x + 1},0);
+def eNode := Signal.new(e,{|x,y| system.println("X: " + x + " Y: " + y)},0);
+
+-=>(aNode,[cNode,dNode]);
+->(bNode,cNode);
+=->([cNode,dNode],eNode);
+def sources := <>([aNode,bNode,cNode,dNode,eNode]);
+
+def startAlternative(){
+	def source1 := sources.get(a);
+	def source2 := sources.get(b);
+	source1(5)
+};
+startAlternative()

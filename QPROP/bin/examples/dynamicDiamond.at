@@ -1,0 +1,42 @@
+import lobby.algorithm.api;
+////////////////////////
+// Standard Syntax    //
+////////////////////////
+
+deftype t1;
+deftype t2;
+deftype t3;
+deftype t4;
+
+def first := source: t1
+out: [t2,t3];
+
+signal: t2
+in: [t1]
+out: [t4]
+react:{|x| x }
+default: 0;
+
+signal: t3
+in: [t1]
+out: [t4]
+react:{|x| x }
+default: 0;
+
+signal: t4
+in:[t2,t3]
+react:{|@args| system.println(args)};
+
+def start(){
+	first(5)
+};
+start();
+def gen(type){
+	signal: type
+	in: [t1]
+	out: [t4]
+	react:{|x| x}
+	default: 0
+};
+deftype a;
+def n := gen(a);

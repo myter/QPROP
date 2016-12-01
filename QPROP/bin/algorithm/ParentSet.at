@@ -1,0 +1,30 @@
+object:{
+
+	def ParentSetElement := isolate:{
+		def isSource;
+		def parentType;
+			
+		def init(isSource,parentType){
+			self.isSource 	:= isSource;
+			self.parentType := parentType;
+		};
+	};
+
+	//Used to represent the parent set passed around during construction
+	def ParentSet := isolate:{
+		def elements;
+		
+		def init(){
+			elements := [];
+		};
+		
+		def addElement(element){
+			elements := elements + [element];
+		};
+		
+		def each: clojure {
+			elements.each: clojure
+		}
+	}
+
+}

@@ -1,0 +1,84 @@
+import /.at.collections.java.hashmap;
+def FileWriter := object:{
+		def filePath;
+		def jWriter;
+	
+		def init(path){
+			filePath := path;
+			def f := jlobby.java.io.File.new(path);
+			//f.getParentFile().mkdirs();
+			system.println(f.getAbsolutePath());
+			jWriter := jlobby.java.io.PrintWriter.new(f);
+		};
+		
+		def writeLine(ln){
+			def printer := jWriter.&println;
+			(printer.cast(jlobby.java.lang.String))(ln);
+		};
+		
+		def close(){
+			jWriter.flush();
+			jWriter.close();
+			system.println("File closed");
+		}
+	
+};
+//Purely serves as a monitor in order to measure propagation speed, does not coordinate or "lock" the dependency graph
+deftype Master;
+deftype SourceBench;
+//SourceBenchs
+deftype node123 <: SourceBench;
+deftype node124 <: SourceBench;
+deftype node125 <: SourceBench;
+deftype node126 <: SourceBench;
+deftype node127 <: SourceBench;
+deftype node128 <: SourceBench;
+deftype node129 <: SourceBench;
+deftype node130 <: SourceBench;
+deftype node131 <: SourceBench;
+deftype node132 <: SourceBench;
+
+def sourceRefs := [];
+def eventsToPropagate := -1;
+def startTime;
+def stopTime;
+
+def startBench(){
+	startTime := jlobby.java.lang.System.nanoTime();
+	sourceRefs.each:{|ref|
+		eventsToPropagate.doTimes:{|i|
+			system.println("Starting Propagation");
+			ref<-sourcePulse(0);
+		}
+	}
+};
+
+whenever: SourceBench discovered:{|ref|
+	if: !(sourceRefs.contains(ref)) then:{
+		sourceRefs := sourceRefs + [ref];
+		if: ((eventsToPropagate > 0).and:{sourceRefs.length() == 10}) then:{
+			startBench()
+		}
+	}
+};
+
+network.online();
+def remoteInterface := object:{
+	def propagationsFinished := 0;
+	def propagationFinished(){
+		propagationsFinished := propagationsFinished + 1;
+		if: propagationsFinished == eventsToPropagate * sourceRefs.length() then:{
+			stopTime := jlobby.java.lang.System.nanoTime();
+			FileWriter.init("results.txt");
+			FileWriter.writeLine("Finished in: " + (stopTime.intValue() - startTime.intValue()));
+			FileWriter.close();
+		}
+	}
+};
+export: remoteInterface as: Master;
+//eventsToPropagate := system.argv[1]
+object:{
+	def set(ev){
+		eventsToPropagate := ev
+	}
+}

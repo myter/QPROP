@@ -1,0 +1,450 @@
+object:{
+	import ~.PropagationPath;
+	import ~.Util;
+	import ~.ParentSet;
+	import /.at.lang.futures;
+	import /.at.lang.multifutures;
+	enableFutures(false);
+	
+	def makeNode(selfType,directParents,directChildren,lambda,defVal) {
+		//Table of parent types
+		def directParentTypes := directParents;
+		//Table of child types
+		def directChildrenTypes := directChildren;
+		def myType := selfType;
+		//Table of refs to direct parents
+		def directParentRefs := [];
+		//Hashmap of default values for each direct parent
+		def directParentDefs := HashMap.new();
+		//Hashmap of last known value for each direct parent
+		def directParentLast := HashMap.new();
+		//Table of refs to direct children
+		def directChildrenRefs := [];
+		//Table of all parent types (acquired through construction)
+		def sourceMap := HashMap.new();
+		def propagationPaths := HashMap.new();
+		def inputQueues := HashMap.new();
+		def outputQueues := HashMap.new();//Probably not needed given this is AT ?
+		def nodeLambda := lambda;
+		//Default value for this node (will be sent to children during construction)
+		def defaultValue := defVal;
+		//Keep track of which parents already provided their parent set
+		def parentsReceived := 0;
+		//Keep track of which children have already sent "start"
+		def startsReceived := 0;
+		//Used to buffer changes to input node before graph is ready to process 
+		def readyListeners := [];
+		//Keep track for which origins this node is deemed unstable
+		def instabilitySet := Set.new();
+		//Time stamp used by source nodes
+		def stampCounter := 0;
+		
+		
+		//Check whether one of the parents or children of the node to be created is already completely constructed (in which case the new node is added dynamically to the graph)
+		def pickInit(){
+			//TODO simply check whether you were statically detailed in child or parent in or out types (easier and always correct)
+			directParents.each:{|dp|
+				inputQueues.put(dp,IQSet.new());
+			};
+			directChildren.each:{|dc|
+				outputQueues.put(dc,Queue.new(dc));
+			};
+			//If a ref (either parent or child) has the node as direct parent or child, current node must be part of static graph
+			def check(ref){
+				when: ref<-isReferenced(myType)@FutureMessage becomes:{|b|
+					if: b then:{
+						initRegular()
+					}
+					else:{
+						system.println("Init dynamic for node: " + selfType);
+						initDynamic()
+					}
+				}
+			};
+			if: directParentTypes.length() == 0 then:{
+				when: directChildrenTypes[1] discovered:{|dcref|
+					check(dcref)
+				}
+			}
+			else:{
+				when: directParentTypes[1] discovered:{|dpref|
+					check(dpref)
+				}
+			}
+		};
+		
+		//def getAllParents(){
+		//	if: directParentTypes.length() == 0 then:{
+		//		(ParentSet.new()).addElement(ParentSetElement.new(true,myType))
+		//	}
+		//	else:{
+		//		allParentTypes.addElement(ParentSetElement.new(false,myType))
+		//	}
+		//};
+		
+		def getAllSources(){
+			def all := [];
+			def it := sourceMap.values().iterator();
+			while: {it.hasNext()} do:{
+				def ss := it.next();
+				ss.each:{|s|
+					if: !(all.contains(s)) then:{
+						all := all + [s]
+					}
+				}
+			};
+			if: directParentTypes.length() == 0 then:{
+				all := all + [myType];
+			};
+			isolate:{|all|
+				def sources := all
+			}
+		};
+		
+		def initRegular(){
+			//Discover each parent to obtain ref (concrete input queues are created after having received responses for parent requested)
+			directParents.each:{|dp|
+				whenever: dp discovered:{|dpref|
+					if: !(directParentRefs.contains(dpref)) then:{
+						directParentRefs := directParentRefs + [dpref];
+						sendReady();
+						if:((receivedAllParents()).and:{directChildrenTypes.length == 0}) then:{
+							directParentRefs.each:{|pref|
+								pref<-receiveStart();
+							};
+						}
+					}
+				}
+			};
+			//Create output queue for each child + discover each child to obtain ref
+			directChildren.each:{|dc|
+				whenever: dc discovered:{|dcref|
+					if: !(directChildrenRefs.contains(dcref)) then:{
+						directChildrenRefs := directChildrenRefs + [dcref];
+						//Node is a source node, start construction of graph
+						if: ((directChildrenRefs.length() == directChildrenTypes.length()).and:{directParentTypes.length() == 0}) then:{
+							directChildrenRefs.each:{|dcref|
+								dcref<-receiveParents(myType,getAllSources(),defaultValue);
+							}
+						}
+						else:{
+							//there might be a case in which we have already received our parents, but only now discover a child
+							//because of async discovery of AT , not related to pure algorithm were refs to children are given at startup
+							sendParents()
+						}
+					}
+				}
+			};
+		};
+		
+		def initDynamic(){
+			def updateParents(){
+				directParentRefs.each:{|dpref|
+					dpref<-addChildRef(remoteInterface)
+				};
+			};
+			def updateChildren(){
+				def childrenUpdated := 0;
+				directChildren.each:{|dc|
+					outputQueues.put(dc,Queue.new(dc));
+					whenever: dc discovered:{|dcref|
+						if: !(directChildrenRefs.contains(dcref)) then:{
+							directChildrenRefs := directChildrenRefs + [dcref];
+							when: dcref<-updateSources(myType,getAllSources(),true,defaultValue)@FutureMessage  becomes:{|ok|
+								childrenUpdated := childrenUpdated + 1;
+								if: childrenUpdated == directChildren.length() then:{
+									updateParents()
+								}
+							}
+						}
+					}
+				}
+			};
+			def queuesConstructed := 0;
+			directParents.each:{|dp|
+				inputQueues.put(dp,IQSet.new());
+				whenever: dp discovered:{|dpref|
+					if: !(directParentRefs.contains(dpref)) then:{
+						directParentRefs := directParentRefs + [dpref];
+						when: dpref<-getDefVal()@FutureMessage becomes:{|dVal|
+							directParentDefs.put(dp,defVal);
+						};
+						when: dpref<-getSourceMap()@FutureMessage becomes:{|sources|
+							def mySources := getAllSources().sources;
+							sources.sources.each:{|s|
+								if: (mySources.contains(s).and:{!(instabilitySet.contains(s))}) then:{
+									instabilitySet.addElement(s)
+								}
+							};
+							constructQueue(dp,sources.sources);
+							queuesConstructed := queuesConstructed + 1;
+							if: queuesConstructed == directParents.length() then:{
+								updateChildren()
+							}
+						}
+					}
+				}
+			}
+		};
+		
+		def receivedAllParents(){
+			parentsReceived == directParentTypes.length();
+		};
+		
+		def sendParents(){
+			if: (receivedAllParents().and:{directChildrenRefs.length() == directChildrenTypes.length()}) then:{
+				directChildrenRefs.each:{|dcref|
+					dcref<-receiveParents(myType,getAllSources(),defaultValue);
+				};
+				//If this node is a sink node and all its parents have sent a receiveParent(), initiate propagation. But only if all parents were discovered (tied to AT async discovery again, check in parent discovery for late ref)
+				if: ((directChildrenTypes.length() == 0).and:{directParentTypes.length() == directParentRefs.length()}) then:{
+					directParentRefs.each:{|pref|
+						pref<-receiveStart();
+					};
+				};
+			}
+		};
+		
+		def sendReady(){
+			if: (((startsReceived == directChildrenTypes.length()).and:{directParentRefs.length() == directParentTypes.length()}).and:{directChildrenTypes.length() != 0}) then:{
+				directParentRefs.each:{|pref|
+					pref<-receiveStart();
+				};
+				readyListeners.each:{|lam|
+					lam()
+				};
+			};
+		};
+		
+		def getArgumentPosition(qOwner){
+			directParentTypes.find:{|el|
+				el == qOwner
+			}
+		};
+		
+		def getPropagationArguments(messageOrigin){
+			def propValues[directParentTypes.length()];
+			iterate(inputQueues,{|owner,qset|
+				if: qset.hasQueue(messageOrigin) then:{
+					//At this point we know we can safely dequeue a value from the queue of this particular origin
+					def q := qset.getQueue(messageOrigin);
+					propValues[getArgumentPosition(owner)] := q.dequeue().value;
+				}
+				else:{
+					//Take the default value if there is no last known value, take last known value otherwise
+					if: directParentLast.containsKey(owner) then:{
+						propValues[getArgumentPosition(owner)] := directParentLast.get(owner)
+					}
+					else:{
+						propValues[getArgumentPosition(owner)] := directParentDefs.get(owner)
+					};	
+				}
+			});
+			propValues
+		};
+		
+		//Check whether node can propagate according to algorithm spec
+		def canPropagate(messageOrigin){
+			def propagate := true;
+			def qs := [];
+			//Run over all input queues and check whether each queue belonging to this origin has at least one value
+			iterate(inputQueues,{|owner,qset|
+				if: qset.hasQueue(messageOrigin) then:{
+					def q := qset.getQueue(messageOrigin);
+					qs := qs + [q];
+					if: q.isEmpty() then:{
+						propagate := false;
+					}
+				}
+			});
+			if: instabilitySet.contains(messageOrigin) then:{
+				//Check whether qs need to be stabilised (if possible) before propagating
+				propagate.and:{canStabilise(qs,messageOrigin)}
+			}
+			else:{
+				propagate
+			}
+		};
+		
+		//Will already stablise queues if possible 
+		def canStabilise(qs,messageOrigin){
+			def commonStamps := [];
+			def allStamps := [];
+			def commonTimeStamp := false;
+			qs.each:{|q|
+				q.peekAll({|v|
+					def found := true;
+					allStamps := allStamps + [v.timeStamp];
+					qs.each:{|qq|
+						if: qq != q then:{
+							found := found.and:{qq.contains({|vv| vv.timeStamp == v.timeStamp})};
+						}
+					};
+					if: (found.and:{!(commonStamps.contains(v.timeStamp))}) then:{
+								commonStamps := commonStamps + [v.timeStamp]
+					};
+					commonTimeStamp := commonTimeStamp.or:{found};
+				})
+			};
+			//If there are value with the same time stamp in all queues, pick lowest such value and remove all values with lower time stamps
+			if: commonTimeStamp then:{
+				def lowest := -1;
+				commonStamps.each:{|stamp|
+					if: ((stamp < lowest).or:{lowest < 0}) then:{
+						lowest := stamp
+					}
+				};
+				qs.each:{|q|
+					q.remove({|msg|
+						msg.timeStamp >= lowest
+					})
+				};
+				instabilitySet.removeElement(messageOrigin);
+			};
+			commonTimeStamp
+		};
+		
+		def constructQueue(from,sources){
+			sourceMap.put(from,sources);
+			sources.each:{|s|
+			//Add an input queue for this sourcenode X input type pair
+			(inputQueues.get(from)).addQueue(s);
+			};
+		};
+		
+		def remoteInterface := object:{ 
+			
+			def isReferenced(nodeType){
+				directParentTypes.contains(nodeType).or:{directChildrenTypes.contains(nodeType)}
+			};
+			
+			def getDefVal(){
+				defaultValue
+			};
+			
+			def getSourceMap(){
+				getAllSources()
+			};
+			
+			def updateSources(from,srcs,updateDef := false,defVal := nil){
+				def sources := srcs.sources;
+				def mySources := getAllSources().sources;
+				sources.each:{|s|
+					if: (mySources.contains(s).and:{!(instabilitySet.contains(s))}) then:{
+						instabilitySet.addElement(s);
+					};
+				};
+				//Might be a direct child of the node causing update
+				if: updateDef then:{
+					inputQueues.put(from,IQSet.new());
+					directParentDefs.put(from,defVal);
+					directParentTypes := directParentTypes + [from];
+				};
+				constructQueue(from,sources);
+				if: directChildrenRefs.length() == 0 then:{
+					def [mf,resolver] := makeMultiFuture(0);
+					//Returns future which will be immediatly resolved since multifuture upper bound is 0
+					whenAll: mf resolved:{|v|
+						"ok"
+					}
+				}
+				else:{
+					def [mf,resolver] := makeMultiFuture(directChildrenRefs.length());
+					directChildrenRefs.each:{|dcref|
+						when: dcref<-updateSources(myType,srcs)@FutureMessage  becomes:{|ok|
+							resolver.resolve(ok)
+						}
+					};
+					whenAll: mf resolved:{|v|
+						"ok"
+					}
+				};
+			};
+			
+			def addChildRef(dcref){
+				directChildrenRefs := directChildrenRefs + [dcref]
+			};
+		
+			//Used during construction phase
+			def receiveParents(from,sources,defVal){
+				parentsReceived 			:= parentsReceived + 1;
+				directParentDefs.put(from,defVal);
+				constructQueue(from,sources.sources);
+				sendParents()
+			};
+			
+			def receiveStart(){
+				startsReceived := startsReceived + 1;
+				sendReady()
+			};
+			
+			def receiveMessage(from,message){
+				def qset 		:= inputQueues.get(from);
+				def originQueue := qset.getQueue(message.origin);
+				originQueue.enqueue(message);
+				directParentLast.put(from,message.value);
+				def canProp 	:= canPropagate(message.origin);
+				if: canProp then:{
+					def args := getPropagationArguments(message.origin);
+					def newVal := nodeLambda.apply(args);
+					directChildrenRefs.each:{|ref|
+							ref<-receiveMessage(myType, PropValue.new(message.origin,newVal,message.timeStamp));
+					}
+				}
+			};
+			
+			//Invoked by outside world on source node (in distributed context)
+			def sourcePulse(value){
+				if: startsReceived == directChildrenTypes.length() then:{
+					def newVal := nodeLambda(value);
+					directChildrenRefs.each:{|ref|
+							ref<-receiveMessage(myType, PropValue.new(myType,newVal,stampCounter));
+					};
+					stampCounter := stampCounter + 1
+				}
+				else:{
+					def listener := {||
+						def newVal := nodeLambda(value);
+						directChildrenRefs.each:{|ref|
+							ref<-receiveMessage(myType, PropValue.new(myType,newVal,stampCounter));
+						};
+						stampCounter := stampCounter + 1
+					};
+					readyListeners := readyListeners + [listener]
+				}
+			};
+			
+		};
+		
+		export: remoteInterface as: selfType;
+		
+		def localInterface := object:{
+		
+			//Used by "outside world" to imperatively update a source node
+			def updateValue(val){
+				if: startsReceived == directChildrenTypes.length() then:{
+					def newVal := nodeLambda(val);
+					directChildrenRefs.each:{|ref|
+							ref<-receiveMessage(myType, PropValue.new(myType,newVal,stampCounter));
+					};
+					stampCounter := stampCounter + 1
+				}
+				else:{
+					def listener := {||
+						def newVal := nodeLambda(val);
+						directChildrenRefs.each:{|ref|
+							ref<-receiveMessage(myType, PropValue.new(myType,newVal,stampCounter));
+						};
+						stampCounter := stampCounter + 1
+					};
+					readyListeners := readyListeners + [listener]
+				}
+			}
+			//Debug
+			
+			
+		};
+		pickInit();
+		localInterface
+	};
+}

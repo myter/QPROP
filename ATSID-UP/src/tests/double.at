@@ -1,0 +1,53 @@
+import /.at.lang.futures exclude seconds,minutes,millisec;
+import /.at.support.timer;
+import lobby.algorithm.nodes;
+import lobby.algorithm.utils;
+import lobby.algorithm.admitter;
+enableFutures(true);
+
+def isEven(x){
+	x % 2 == 0
+};
+
+def adm 		:= makeAdmitter("adm");
+def secs 		:= makeNode("secs",[],{|v| v});
+def x 	 		:= makeNode("x",[secs],{|s| s + 1});
+def y 			:= makeNode("y",[secs],{|s| s + 1});
+def alwaysEven	:= makeNode("alwaysEven",[x,y],{|x,y| system.println("Even? => " + isEven(x + y));x + y});
+def x2 			:= makeNode("xx",[alwaysEven],{|s| s + 1});
+def y2 			:= makeNode("yy",[alwaysEven],{|s| s + 1});
+def alwaysEven2 := makeNode("alwaysEven2",[x2,y2],{|x,y| system.println(system.println("Got x: " + x + " and y: " + y))});
+
+
+def counter := 0;
+def runOnce(){
+	adm<-changeWith([secs],[1]);
+};
+
+def printDeps(ref){
+	when: (ref<-reachableSet())<-els() becomes:{|elements|
+		elements.each:{|e|
+			when: e<-getName() becomes:{|n|
+				system.println(n);
+			}
+		}
+	};
+};
+
+def printChildren(ref){
+	when: ref<-children() becomes: {|children|
+		children.each:{|c|
+			when: c<-getName() becomes:{|n|
+				system.println(n);
+			}
+		}
+	}
+};
+
+def startTest(){
+	adm<-changeWith([secs],[counter]);
+	counter := counter + 1;
+	when: 4.seconds() elapsed:{
+		startTest()
+	}
+}

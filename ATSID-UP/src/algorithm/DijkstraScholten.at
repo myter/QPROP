@@ -1,0 +1,74 @@
+//Implementation of Dijkstra-Scholten's algorithm for diffusing computations
+object:{
+
+	def DijkstraScholten := object:{
+		//Deficit on incoming edges
+		def c := 0;
+		//Deficit on outgoing edges
+		def d := 0;
+		//incoming edges
+		def incoming := [];
+		//Idle state
+		def idle := 0;
+		//Processing state
+		def processing := 1;
+		def state := idle;
+		//Listener to catch event of termination (used by admitters)
+		def listener;
+		
+		//Given listener must be lambda with arity zero
+		def init(listen := {||}){
+			listener := listen;
+		};
+		
+		//Method called after nodes has received message from parent
+		def newParentMessage(parent){
+			state := processing;
+			d := d + 1;
+			incoming := incoming + [parent]
+		};
+		
+		//Method called after node has sent message to child
+		//No need to know who the child is (i.e. just need an ack from every child)
+		def newChildMessage(){
+			state := processing;
+			c  := c + 1;
+		};
+		
+		def newAckMessage(){
+			c := c - 1;
+			//outgoing deficit is zero, start sending acks to parents
+			if: c == 0 then:{
+				//Send ack to all parents
+				//Total deficit for this node should be zero, node has returned to idle state
+				sendAcks()
+			}
+		};
+		
+		//In our case output nodes have no children
+		//If the output node has been reevaluated (i.e. it has either received all new values or reused previous values) we know it has terminated (can safely send back acks)
+		def nodeTerminated(){
+			sendAcks()
+		};
+		
+		//Internal method called if either c == 0 or node has terminated (if output node)
+		def sendAcks(){
+			incoming.each:{|i|
+				d := d - 1;
+				i<-ack()
+			};
+			if: (d == 0) then:{
+				state := idle;
+				//Reset incoming edges
+				incoming := [];
+				listener()
+			}
+		};
+		
+		def isIdle(){
+			state == idle;
+		}
+	
+	}
+
+}

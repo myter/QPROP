@@ -1,0 +1,29 @@
+import lobby.algorithm.api;
+
+////////////////////////
+// Alternative Syntax //
+////////////////////////
+
+deftype a;
+deftype b;
+deftype c;
+deftype d;
+
+def count := 0;
+def aNode := SampleSource.new(a,{count := count + 1;count},50.millisec());
+def bNode := Signal.new(b,{|x| x},0);
+def cNode := Signal.new(c,{|x| x},0);
+def dNode := Signal.new(d,{|@args| system.println(args)},nil);
+
+-=>(aNode,[bNode,cNode]);
+=->([bNode,cNode],dNode);
+def sources := <>([aNode,bNode,cNode,dNode]);
+deftype e;
+when: 2.seconds() elapsed:{
+	def eNode := Signal.new(e,{|x| x},0);
+	->*(aNode,eNode);
+	*->(eNode,dNode);
+	<>*([eNode]);
+}
+
+//After two seconds a node is added dynamically, 1 times out of 3 this leads to value jumping in or two increments due to instability (re-run to see this happen)

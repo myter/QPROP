@@ -1,0 +1,59 @@
+import lobby.algorithm.nodes;
+
+object:{
+	
+	//Object used to generate a synchronise diamond graph (i.e. single input node followed by amount of diamond shaped sub-graphs, with varying fanout)
+	//Will link generated diamond subgraphs to input node on one end and output node on other end
+	def DiamondGenerator := object:{
+		def totalNodes;
+		def maximumFanout;
+		def actualNodes;
+		//Reference to first node (used by admitter)
+		def firstJoin;
+
+	
+		def init(total,maxFanout){
+			totalNodes := total;
+			maximumFanout := maxFanout;
+			actualNodes := 0;
+			//Generate first join node
+			def join := makeNode("",[],{|v| v});
+			firstJoin := join;
+			generate(join);
+		};
+		
+		def generate(prevJoin){
+			if: !(actualNodes > totalNodes) then:{
+				//spawn fanout nodes
+				def fanoutRefs 	:= generateFanout(prevJoin);
+				//Spawn new join node
+				def newJoin		:= makeNode("",fanoutRefs,{|@vals|
+					def return := 0;
+					vals.each:{|v|
+						return := return + v;
+					};
+					return
+				});
+				actualNodes := actualNodes + 1;
+				//continue generation of diamonds
+				generate(newJoin)
+			}
+		};
+		
+		
+		def generateFanout(forJoin){
+			//Minimum fanout level is 2
+			def toFan 		:= (2.??(maximumFanout)).floor();
+			def fanoutRefs := [];
+			while:{toFan > 0} do:{
+				//spawn fanout node
+				def newFan 	:= makeNode("",[forJoin],{|v| v});
+				fanoutRefs 	:= fanoutRefs + [newFan];
+				toFan 		:= toFan - 1;
+				actualNodes := actualNodes + 1;
+			};
+			fanoutRefs
+		}
+	}
+
+};

@@ -1,0 +1,105 @@
+//Contains helping structures
+
+object:{
+
+	//Values passed around during propagation phase
+	def Pulse := isolate:{
+		//Set of source nodes changed
+		def changed;
+		def value;
+		
+		def init(changeSet,val){
+			changed := changeSet;
+			value := val;
+		}
+	};
+	
+	//Values passed around during propagation phase between remote hosts
+	def MirroredPulse := extend: Pulse with: {
+		
+		def pulseState;
+		
+		def init(changeSet,val,state){
+			super.init(changeSet,val);
+			pulseState := state;
+		}; 
+	
+	};
+	
+	//Held by each node indicating it's state in current update turn
+	def PulseState := isolate:{
+		def pending 	:= 0;
+		def unchanged 	:= 1;
+		def changed		:= 2;
+		def state 		:= pending;
+		
+		def isPending(){
+			state == pending;
+		};
+		
+		def isUnchanged(){
+			state == unchanged;
+		};
+		
+		def isChanged(){
+			state == changed;
+		};
+		
+		def setPending(){
+			state := pending;
+		};
+		
+		def setUnchanged(){
+			state := unchanged;
+		};
+		
+		def setChanged(){
+			state := changed;
+		};
+	};
+	
+	def Set := isolate:{
+		def els;
+		
+		def init(elements := []){
+			els := elements;
+		};
+		
+		def union(otherSet){
+			def temp := els;
+			(otherSet.els).each:{|e|
+				if: !(temp.contains(e)) then:{
+					temp := temp + [e];
+				}
+			};
+			temp
+		};
+		
+		def intersection(otherSet){
+			def temp := [];
+			els.each:{|e|
+				if: (otherSet.els).contains(e) then:{
+					temp := temp + [e];
+				}
+			};
+			temp;
+		};
+		
+		def isEmpty(){
+			els.length() == 0;
+		}
+	};
+	
+	//Represents state of remote parent node
+	def Mirror := isolate:{
+		def owner;
+		def steadyValue;
+		def pulseValue;
+		
+		def init(own){
+			owner := own;
+			steadyValue := nil;
+			pulseValue := PulseState.new();
+		}
+	}
+}

@@ -1,0 +1,52 @@
+import ~.speed;
+import ~.fileWriter;
+import /.at.support.timer;
+
+
+def schedule := [];
+
+def runAll(sampleSize){
+	def writer10 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-speed-10.txt");
+	writer10.writeLine("Starting tests for graph size 10");
+	run(writer10,10,sampleSize);
+	def writer100 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-speed-100.txt");
+	schedule := schedule + [{|| writer100.writeLine("Starting tests for graph size 100");run(writer100,100,sampleSize);}];
+	def writer500 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-speed-500.txt");
+	schedule := schedule + [{|| writer500.writeLine("Starting tests for graph size 500");run(writer500,500,sampleSize);}];
+	def writer1000 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-speed-1000.txt");
+	schedule := schedule + [{|| writer1000.writeLine("Starting tests for graph size 1000");run(writer1000,1000,sampleSize);}]
+};
+
+def run(writer,size,sz){
+	def callback := {|time|
+			writer.writeLine(time.toString());
+			sz := sz - 1;
+			if: !(sz == 0) then:{
+				step()
+			}
+			else:{
+				writer.close();
+				if: schedule.length() > 0 then:{
+					def next := schedule.at(1);
+					schedule := schedule.select(2,schedule.length() + 1);
+					next();
+				}
+				else:{
+					system.println("Benchmarks done");
+				}
+			}
+	};
+	def bench := SpeedBenchmark.new(size,2,callback);
+	bench.construct();
+	
+	//Wait for graph construction
+	when: 30.seconds elapsed:{
+		def afterWarmup := {|| system.println("warmup done");step()};
+		system.println("Warming up");
+		bench.warmup(100,afterWarmup)
+	};
+	
+	def step(){
+		bench.run()
+	}
+}

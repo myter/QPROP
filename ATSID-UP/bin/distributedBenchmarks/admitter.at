@@ -1,0 +1,96 @@
+import lobby.algorithm.admitter;
+import /.at.lang.futures;
+enableFutures(false);
+deftype Admitter;
+deftype Source;
+network.online();
+
+def FileWriter := object:{
+		def filePath;
+		def jWriter;
+	
+		def init(path){
+			filePath := path;
+			def f := jlobby.java.io.File.new(path);
+			//f.getParentFile().mkdirs();
+			system.println(f.getAbsolutePath());
+			jWriter := jlobby.java.io.PrintWriter.new(f);
+		};
+		
+		def writeLine(ln){
+			def printer := jWriter.&println;
+			(printer.cast(jlobby.java.lang.String))(ln);
+		};
+		
+		def close(){
+			jWriter.flush();
+			jWriter.close();
+			system.println("File closed");
+		}
+	
+};
+
+def sources := [];
+def waiting := false;
+def turnsEnded := 0;
+def eventsToPropagate;
+def startTime;
+def stopTime;
+def runs;
+def runsDone := 0;
+def results := [];
+def node := makeAdmitter("adm",{|| 
+	turnsEnded := turnsEnded + 1;
+	if: turnsEnded == eventsToPropagate * 10 then:{
+		stopTime := jlobby.java.lang.System.nanoTime();
+		results := results + [(stopTime.intValue() - startTime.intValue())];
+		runsDone := runsDone + 1;
+		if: !(runsDone == runs)then:{
+			system.println("Runs completed: " + runsDone);
+			turnsEnded := 0;
+			remoteInterface.startBench()
+		}
+		else:{
+			FileWriter.init("resultsATSIDUP" + eventsToPropagate +".txt");
+			results.each:{|res|
+				FileWriter.writeLine(res)
+			};
+			FileWriter.close();
+		}
+	}
+});
+whenever: Source discovered:{|sRef|
+	when: sRef<-getNodeRef(self)@FutureMessage becomes:{|nRef|
+		if: !(sources.contains(nRef)) then:{
+			sources := sources + [nRef];
+			if: waiting then:{
+				remoteInterface.startBench()
+			}
+		}
+	}
+};
+
+def remoteInterface := object:{
+	def startBench(){
+		if: sources.length() == 10 then:{
+			startTime := jlobby.java.lang.System.nanoTime();
+			sources.each:{|source|
+				eventsToPropagate.doTimes:{|i|
+					node<-changeWith([source],[0])
+				}
+			}
+		}
+		else:{
+			waiting := true;
+		}
+	}
+};
+export: remoteInterface as: Admitter;
+//eventsToPropagate := (system.argv[1]).parseNumeric();
+//runs := (syste.argv[2]).parseNumeric();
+object:{
+	def set(e,r){
+		eventsToPropagate := e;
+		runs := r
+	}
+}

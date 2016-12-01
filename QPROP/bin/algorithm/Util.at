@@ -1,0 +1,136 @@
+object:{
+
+	import /.at.collections.java.hashmap;
+	
+	
+	def Queue := object:{
+		def origin;
+		def values;
+		
+		def init(origin){
+			self.origin := origin;
+			values 		:= []
+		};
+		
+		def enqueue(val){
+			values := values + [val]
+		};
+		
+		def peek(){
+			values[1];
+		};
+		
+		def dequeue(){
+			def temp := values[1];
+			values := values.select(2,values.length() + 1);
+			temp
+		};
+		
+		def isEmpty(){
+			values.length() == 0;
+		};
+		
+		def peekAll(clo){
+			values.each: clo
+		};
+		
+		def map(clo){
+			values.map: clo
+		};
+		
+		def contains(comp){
+			def found := values.find: comp;
+			found != nil
+		};
+		
+		def remove(comp){
+			def newValues := [];
+			values.each:{|v|
+				if: comp(v) then:{
+					newValues := newValues + [v]
+				}
+			};
+			values := newValues
+		};
+		
+	};
+	
+	def PropValue := isolate:{
+		def origin;
+		def value;
+		def timeStamp;
+		
+		def init(origin,value,timeStamp){
+			self.origin 	:= origin;
+			self.value 		:= value;
+			self.timeStamp  := timeStamp;
+		};
+	};
+	
+	def Set := object:{
+		def vals := [];
+		def union(otherSet){
+			def newVals := [] + vals;
+			otherSet.vals.each:{|v|
+				if: !(newVals.contains(v)) then:{
+					newVals = newVals + [v]
+				}
+			}
+		};
+		def minus(otherSet){
+			def newVals := [];
+			vals.each:{|v|
+				if: !(otherSet.contains(v)) then:{
+					newVals = newVals + [v]
+				}
+			}
+		};
+		def addElement(el){
+			vals := vals + [el]
+		};
+		def removeElement(el){
+			vals := vals.filter:{|e| e != el}
+		};
+		def contains(el){
+			vals.contains(el)
+		};
+		def isEmpty(){
+			vals.length() == 0
+		}
+	};
+	
+	//Keep track of all queues associated to a node's particular input
+	def IQSet := object:{
+		def qs;
+		
+		def init(){
+			qs := [];
+		};
+		
+		def addQueue(forOrigin){
+			qs := qs + [Queue.new(forOrigin)];
+		};
+		
+		def hasQueue(forOrigin){
+			(qs.filter:{|q| q.origin == forOrigin}).length() > 0;
+		};
+		
+		def getQueue(forOrigin){
+			(qs.filter:{|q| q.origin == forOrigin})[1];
+		};
+	};
+	
+	def iterate(map,clo){
+		def keys := map.keySet();
+		def keysTab := (keys.getCollection()).toArray();
+		def vals := map.values();
+		def valsTab := (vals.getCollection()).toArray();
+		def length := keysTab.length();
+		1.to: length + 1 do:{|i|
+			def key := keysTab[i];
+			def val := valsTab[i];
+			clo(key,val)
+		}
+	};
+
+}

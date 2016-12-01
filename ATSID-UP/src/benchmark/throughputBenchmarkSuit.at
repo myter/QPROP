@@ -1,0 +1,62 @@
+import ~.throughput;
+import ~.fileWriter;
+import /.at.support.timer;
+
+
+def schedule := [];
+
+def runAdmitter(sampleSize){
+	def writer1 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-adm-1.txt");
+	writer1.writeLine("Starting tests for admitter size 1");
+	run(writer1,1,10,100,sampleSize);
+	def writer2 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-adm-2.txt");
+	schedule := schedule + [{|| writer2.writeLine("Starting tests for admitter size 2");run(writer2,2,10,100,sampleSize);}];
+	def writer4 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-adm-4.txt");
+	schedule := schedule + [{|| writer4.writeLine("Starting tests for admitter size 4");run(writer4,4,10,100,sampleSize);}];
+};
+
+def runNode(sampleSize){
+	def writer10 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-nodes-10.txt");
+	writer10.writeLine("Starting tests for node size 10");
+	run(writer10,2,10,10,sampleSize);
+	def writer100 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-nodes-100.txt");
+	schedule := schedule + [{|| writer100.writeLine("Starting tests for node size 100");run(writer100,2,10,100,sampleSize);}];
+	def writer200 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-nodes-200.txt");
+	schedule := schedule + [{|| writer200.writeLine("Starting tests for admitter size 4");run(writer200,2,10,200,sampleSize);}];
+	def writer500 := FileWriter.new("/Users/flo/Desktop/Research/ADRP/REBLS'15/paper/benchmarks/ATSIDUP-throughput-nodes-500.txt");
+	schedule := schedule + [{|| writer500.writeLine("Starting tests for admitter size 4");run(writer500,2,10,500,sampleSize);}];
+};
+
+def run(writer,admSize,changeSize,nodeSize,sz){
+	def callback := {|time|
+			writer.writeLine(time.toString());
+			sz := sz - 1;
+			if: !(sz == 0) then:{
+				step()
+			}
+			else:{
+				writer.close();
+				if: schedule.length() > 0 then:{
+					def next := schedule.at(1);
+					schedule := schedule.select(2,schedule.length() + 1);
+					next();
+				}
+				else:{
+					system.println("Benchmarks done");
+				}
+			}
+	};
+	def bench := ThroughputBenchmark.new(admSize,changeSize,nodeSize,2,callback);
+	bench.construct();
+	
+	//Wait for graph construction
+	when: 30.seconds elapsed:{
+		def afterWarmup := {|| system.println("warmup done");step()};
+		system.println("Warming up");
+		bench.warmup(10,afterWarmup)
+	};
+	
+	def step(){
+		bench.run()
+	}
+}

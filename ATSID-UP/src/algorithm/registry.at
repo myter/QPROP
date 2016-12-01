@@ -1,0 +1,18 @@
+object:{
+
+	def makeRegistry(){
+		actor:{
+			def peers := jlobby.java.util.HashMap.new();
+			
+			def register(name,ref){
+				peers.put(name,ref);
+			};
+			
+			def lookup(name){
+				peers.get(name);
+			}
+		
+		}
+	}
+
+}
