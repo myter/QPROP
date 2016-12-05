@@ -38,6 +38,7 @@ object:{
 		def instabilitySet := Set.new();
 		//Time stamp used by source nodes
 		def stampCounter := 0;
+		def dynamic := false;
 		
 		
 		//Check whether one of the parents or children of the node to be created is already completely constructed (in which case the new node is added dynamically to the graph)
@@ -56,8 +57,8 @@ object:{
 						initRegular()
 					}
 					else:{
-						system.println("Init dynamic for node: " + selfType);
-						initDynamic()
+						initDynamic();
+						dynamic := true;
 					}
 				}
 			};
@@ -184,6 +185,9 @@ object:{
 						}
 					}
 				}
+			};
+			if: directParents.length() == 0 then:{
+				updateChildren()
 			}
 		};
 		
@@ -422,7 +426,7 @@ object:{
 		
 			//Used by "outside world" to imperatively update a source node
 			def updateValue(val){
-				if: startsReceived == directChildrenTypes.length() then:{
+				if: ((startsReceived == directChildrenTypes.length()).or:{dynamic}) then:{
 					def newVal := nodeLambda(val);
 					directChildrenRefs.each:{|ref|
 							ref<-receiveMessage(myType, PropValue.new(myType,newVal,stampCounter));

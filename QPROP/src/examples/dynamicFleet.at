@@ -1,0 +1,59 @@
+import lobby.algorithm.api;
+deftype Tool1;
+deftype Tool2;
+deftype Tool3;
+deftype Tracker;
+deftype Guard;
+deftype Map;
+deftype AI;
+deftype Client;
+
+
+
+signal: Tracker
+in: []
+out: [Guard,Map,AI]
+react:{|@args| args}
+default:[0];
+
+signal: Guard
+in: [Tracker]
+out:[]
+react:{|posList| system.println("Guard acknowledged: " + posList)}
+default: nil;
+
+signal: Map
+in: [Tracker]
+out: [Client]
+react:{|posList| posList}
+default: [0,100,250];
+
+def advice := 0;
+signal: AI
+in: [Tracker]
+out: [Client]
+react:{|posList| advice := advice + 1;advice}
+default: 0;
+
+signal: Client
+in: [AI,Map]
+out: []
+react:{|advice,posList| system.println("Updating GUI with: " + posList + " , " + advice)}
+default: nil;
+
+def generateTool(toolType,sample){
+	def tCoords := 0;
+	source: toolType
+	out: [Tracker]
+	sample: {tCoords := tCoords + 1; tCoords}
+	with: sample
+};
+when: 1.seconds() elapsed:{
+	generateTool(Tool1,1.seconds())
+};
+when: 2.seconds() elapsed:{
+	generateTool(Tool2,2.seconds())
+};
+when: 5.seconds() elapsed:{
+	generateTool(Tool3,3.seconds())
+}
