@@ -16,4 +16,5 @@ object Diamond extends App {
   val updateLambda : (List[API.NodeId], List[_]) => _ = API.construct()
   updateLambda(List[API.NodeId](sourceId),List(5))
   updateLambda(List[API.NodeId](sourceId),List(66))
+  println("test");
 }

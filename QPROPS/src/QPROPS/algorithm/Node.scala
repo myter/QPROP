@@ -333,7 +333,7 @@ class SourceNode[T](override val nodeLambda: List[Any] => T,override val defVal:
   var timeStampCounter : Int             = 0
   
   override def receive = super.receive orElse {
-    case UpdateMsg(value : List[Any]) => handleUpdateMsg(value)
+    case UpdateMsg(value) => handleUpdateMsg(value)
   }
   
   protected override def handleInitMsg(directParents: List[ActorRef], directChildren: List[ActorRef]) : Unit = {
@@ -356,13 +356,13 @@ class SourceNode[T](override val nodeLambda: List[Any] => T,override val defVal:
     })
   }
   
-  protected def handleUpdateMsg(value : List[Any]) : Unit = {
-    val toPropagate : T = nodeLambda(value)
+  protected def handleUpdateMsg(value : Any) : Unit = {
+    val toProp : T = nodeLambda(List(value))
     if (startsReceived == directChildren.length){
-      initiatePropagation(toPropagate)
+      initiatePropagation(toProp)
     }
     else{
-      bufferedUpdates += toPropagate
+      bufferedUpdates += toProp
     }
   }
 }

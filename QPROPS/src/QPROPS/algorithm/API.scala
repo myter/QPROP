@@ -5,7 +5,7 @@ import scala.reflect._
 import scala.concurrent.duration._
 //Since the actual TempNode class extends actor it is impossible to transparently create nodes (without explicitly having to spawn actor etc etc) before graph creation
 //A TempTempNode differs the creation of the actual actor until graph construction starts
-protected class TempNode[+T](val nodeLambda: List[Any] => T,val defVal: T, val name : String = null)
+protected class TempNode[+T](val nodeLambda: List[Any] => T,val defVal: T, val name : String = null, val obserVableSource : Boolean = false,val observalbeObject : ObservableObject = null)
 
 object API {
   type NodeId                                                = Integer
@@ -38,6 +38,14 @@ object API {
   //Allows to provide a "name" for a node, mostly used for debugging
   def newNode[T: ClassTag](nodeLambda : List[Any] => T, defVal : T, name : String) : NodeId = {
     val node : TempNode[T] = new TempNode[T](nodeLambda,defVal,name)
+    idCounter             += 1
+    ids                   += (idCounter -> node)
+    signals                = node +: signals
+    idCounter
+  }
+  
+  def newSource[T: ClassTag](o : ObservableObject,defVal : T) : NodeId = {
+    val node : TempNode[T] = new TempNode[T]({args => args(0).asInstanceOf[T]},defVal,null,true,o)
     idCounter             += 1
     ids                   += (idCounter -> node)
     signals                = node +: signals
@@ -83,15 +91,18 @@ object API {
       val isSource   : Boolean = (getParents(tempNode)).size == 0
       var node       : Node[Any] = null
       if (isSource) {
+        var actor : ActorRef = null
         if(tempNode.name == null){
-          val actor : ActorRef = system.actorOf(Props(new SourceNode[Any](tempNode.nodeLambda,tempNode.defVal)))
+          actor = system.actorOf(Props(new SourceNode[Any](tempNode.nodeLambda,tempNode.defVal)))
           actors += (tempNode -> actor)
         }
         else{
-         val actor : ActorRef = system.actorOf(Props(new SourceNode[Any](tempNode.nodeLambda,tempNode.defVal)), tempNode.name)
+         actor = system.actorOf(Props(new SourceNode[Any](tempNode.nodeLambda,tempNode.defVal)), tempNode.name)
          actors += (tempNode -> actor)
         }
-         
+        if(tempNode.obserVableSource){
+          tempNode.observalbeObject.registerSource(actor)
+        }
       }
       else{
         if(tempNode.name == null){
@@ -123,7 +134,7 @@ object API {
         val sourceNode   : TempNode[Any] = ids.get(sourceId).get
         val actor        : ActorRef      = actors.get(sourceNode).get
         val updateValue  : Any           = updateValues(index)
-        actor ! new UpdateMsg(List(updateValue))        
+        actor ! new UpdateMsg(updateValue)      
       }
     }
     signals    = List[TempNode[Any]]()
